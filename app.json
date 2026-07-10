@@ -28,7 +28,8 @@
       "expo-router"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": "/mark-it-done"
     },
     "extra": {
       "router": {},
