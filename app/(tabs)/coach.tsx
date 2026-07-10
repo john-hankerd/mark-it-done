@@ -85,7 +85,7 @@ export default function CoachScreen() {
 
   const loadProfile = async () => {
     try {
-      if (!userId) return;
+      if (!userId) { setLoading(false); return; }
       const profile = await getUserProfile(userId);
       if (profile) {
         setUserName(profile.name || '');

@@ -74,7 +74,7 @@ export default function RewardsScreen() {
 
   const loadData = async () => {
     try {
-      if (!userId) return;
+      if (!userId) { setLoading(false); return; }
 
       const profile = await getUserProfile(userId);
       if (profile) {

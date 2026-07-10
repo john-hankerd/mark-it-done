@@ -65,7 +65,7 @@ export default function DashboardScreen() {
 
   const loadDashboard = async () => {
     try {
-      if (!userId) return;
+      if (!userId) { setLoading(false); return; }
 
       const profile = await getUserProfile(userId);
       if (!profile) { setLoading(false); return; }
