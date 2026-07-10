@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB3pX5EXsjsavNcchQt431L-YTRXA88qNs",
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: "markitdone-27f82.firebaseapp.com",
   projectId: "markitdone-27f82",
   storageBucket: "markitdone-27f82.firebasestorage.app",
