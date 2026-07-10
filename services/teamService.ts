@@ -172,3 +172,9 @@ export async function getUserProfile(userId: string): Promise<any> {
   if (!snap.exists()) return null;
   return snap.data();
 }
+
+export async function setUserIsCoach(userId: string, isCoach: boolean): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    isCoach,
+  });
+}

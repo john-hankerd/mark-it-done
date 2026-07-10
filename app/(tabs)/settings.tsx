@@ -24,7 +24,7 @@ import {
     scheduleDailyReminder,
     setupNotifications,
 } from '../../services/notificationService';
-import { getUserProfile } from '../../services/teamService';
+import { getUserProfile, setUserIsCoach } from '../../services/teamService';
 
 const ORANGE = '#FF6B35';
 
@@ -92,6 +92,18 @@ export default function SettingsScreen() {
       } catch (e) {}
     }
     router.push('/choose-plan');
+  };
+
+  const becomeCoach = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      await setUserIsCoach(uid, true);
+      setIsCoach(true);
+      router.push('/choose-plan');
+    } catch (e) {
+      showAlert('Error', 'Could not switch to a Team plan. Please try again.');
+    }
   };
 
   const loadSettings = async () => {
@@ -366,6 +378,21 @@ export default function SettingsScreen() {
               <Text style={styles.testBtnText}>
                 {stripeCustomerId ? 'Manage Billing' : 'Start Free Trial'}
               </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Become a Coach (Individuals only) */}
+        {!isCoach && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Coaching a Team?</Text>
+            <Text style={styles.settingDesc}>
+              Switch to a Team plan to create a team, assign disciplines, and track everyone's
+              progress. $39/mo or $390/yr, with a 30-day free trial. Your tasks and history stay
+              exactly as they are.
+            </Text>
+            <TouchableOpacity style={styles.testBtn} onPress={becomeCoach}>
+              <Text style={styles.testBtnText}>Become a Coach</Text>
             </TouchableOpacity>
           </View>
         )}
