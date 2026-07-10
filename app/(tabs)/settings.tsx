@@ -3,7 +3,6 @@ import { router } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
     Linking,
     ScrollView,
     StyleSheet,
@@ -13,6 +12,7 @@ import {
     View,
 } from 'react-native';
 import { auth } from '../../firebaseConfig';
+import { showAlert } from '../../services/alert';
 import {
     cancelAllReminders,
     formatTime,
@@ -111,7 +111,7 @@ export default function SettingsScreen() {
       const granted = await setupNotifications();
       if (!granted) {
         setPermissionGranted(false);
-        Alert.alert(
+        showAlert(
           'Permission Required',
           'Please enable notifications in your device settings to use reminders.'
         );
@@ -154,7 +154,7 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+    showAlert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out',
@@ -165,7 +165,7 @@ export default function SettingsScreen() {
             await signOut(auth);
             router.replace('/login');
           } catch (e) {
-            Alert.alert('Error', 'Could not sign out.');
+            showAlert('Error', 'Could not sign out.');
           }
         },
       },

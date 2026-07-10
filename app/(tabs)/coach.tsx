@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   Linking,
   Modal,
   ScrollView,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { showAlert } from '../../services/alert';
 import {
   Team,
   TeamMember,
@@ -173,9 +173,9 @@ export default function CoachScreen() {
       setTeam(newTeam);
       setShowCreateModal(false);
       setTeamNameInput('');
-      Alert.alert('Team Created!', `Share code: ${newTeam.joinCode}`);
+      showAlert('Team Created!', `Share code: ${newTeam.joinCode}`);
     } catch (e) {
-      Alert.alert('Error', 'Could not create team. Check your connection.');
+      showAlert('Error', 'Could not create team. Check your connection.');
     }
     setLoading(false);
   };
@@ -183,14 +183,14 @@ export default function CoachScreen() {
   // ─── Join team (member) ───
   const handleJoinTeam = async () => {
     if (joinCodeInput.trim().length < 6) {
-      Alert.alert('Invalid code', 'Enter a 6-character team code.');
+      showAlert('Invalid code', 'Enter a 6-character team code.');
       return;
     }
     setLoading(true);
     try {
       const joined = await joinTeam(joinCodeInput.trim().toUpperCase(), userId, userName);
       if (!joined) {
-        Alert.alert('Not found', 'That code doesn\'t match any team.');
+        showAlert('Not found', 'That code doesn\'t match any team.');
         setLoading(false);
         return;
       }
@@ -198,9 +198,9 @@ export default function CoachScreen() {
       setTeam(joined);
       setShowJoinModal(false);
       setJoinCodeInput('');
-      Alert.alert('Joined!', `You're now on ${joined.name}`);
+      showAlert('Joined!', `You're now on ${joined.name}`);
     } catch (e) {
-      Alert.alert('Error', 'Could not join team. Check your connection.');
+      showAlert('Error', 'Could not join team. Check your connection.');
     }
     setLoading(false);
   };
@@ -220,11 +220,11 @@ export default function CoachScreen() {
     if (!newTitle.trim() || !team) return;
 
     if (newType === 'deadline' && !newDueDate) {
-      Alert.alert('Missing due date', 'Pick a due date for deadline tasks.');
+      showAlert('Missing due date', 'Pick a due date for deadline tasks.');
       return;
     }
     if (newType === 'scheduled' && newScheduledDays.length === 0) {
-      Alert.alert('No days', 'Pick at least one day.');
+      showAlert('No days', 'Pick at least one day.');
       return;
     }
 
@@ -245,15 +245,15 @@ export default function CoachScreen() {
     try {
       await saveTeamTask(team.id, task);
       resetAddModal();
-      Alert.alert('Task Added', `"${task.title}" pushed to all team members.`);
+      showAlert('Task Added', `"${task.title}" pushed to all team members.`);
     } catch (e) {
-      Alert.alert('Error', 'Could not save task.');
+      showAlert('Error', 'Could not save task.');
     }
   };
 
   const handleRemoveTeamTask = (task: Task) => {
     if (!team) return;
-    Alert.alert('Remove Task', `Remove "${task.title}" from the team?`, [
+    showAlert('Remove Task', `Remove "${task.title}" from the team?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove', style: 'destructive',
@@ -261,7 +261,7 @@ export default function CoachScreen() {
           try {
             await removeTeamTask(team.id, task.id);
           } catch (e) {
-            Alert.alert('Error', 'Could not remove task.');
+            showAlert('Error', 'Could not remove task.');
           }
         },
       },
@@ -304,7 +304,7 @@ export default function CoachScreen() {
     const month = datePickerMonth.getMonth();
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     if (dateStr < today) {
-      Alert.alert('Invalid', 'Due date must be today or later.');
+      showAlert('Invalid', 'Due date must be today or later.');
       return;
     }
     setNewDueDate(dateStr);

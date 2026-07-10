@@ -1,7 +1,6 @@
 // MarkItDone v2.0 — Rewards Screen
 import { useEffect, useState } from 'react';
 import {
-    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -11,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import { auth } from '../../firebaseConfig';
+import { showAlert } from '../../services/alert';
 import { getAllTimePoints } from '../../services/pointsEngine';
 import {
     Redemption,
@@ -114,20 +114,20 @@ export default function RewardsScreen() {
     if (!newTitle.trim() || !teamId) return;
     const cost = parseInt(newCost) || 25;
     if (cost < 1) {
-      Alert.alert('Invalid cost', 'Point cost must be at least 1.');
+      showAlert('Invalid cost', 'Point cost must be at least 1.');
       return;
     }
     try {
       await createReward(teamId, userId, newTitle.trim(), newDesc.trim(), newIcon, cost);
       resetAddModal();
-      Alert.alert('Reward Created!', `"${newTitle.trim()}" is now available.`);
+      showAlert('Reward Created!', `"${newTitle.trim()}" is now available.`);
     } catch (e) {
-      Alert.alert('Error', 'Could not create reward.');
+      showAlert('Error', 'Could not create reward.');
     }
   };
 
   const handleDeleteReward = (reward: Reward) => {
-    Alert.alert('Delete Reward', `Remove "${reward.title}"?`, [
+    showAlert('Delete Reward', `Remove "${reward.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
@@ -135,7 +135,7 @@ export default function RewardsScreen() {
           try {
             await deleteReward(teamId, reward.id);
           } catch (e) {
-            Alert.alert('Error', 'Could not delete reward.');
+            showAlert('Error', 'Could not delete reward.');
           }
         },
       },
@@ -153,14 +153,14 @@ export default function RewardsScreen() {
   // ─── Member: Redeem reward ───
   const handleRedeem = (reward: Reward) => {
     if (availablePoints < reward.pointCost) {
-      Alert.alert(
+      showAlert(
         'Not enough points',
         `You need ${reward.pointCost} pts but have ${availablePoints} available.`
       );
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Redeem Reward',
       `Spend ${reward.pointCost} pts on "${reward.title}"?\n\nYour coach will be notified to approve.`,
       [
@@ -171,9 +171,9 @@ export default function RewardsScreen() {
             try {
               await requestRedemption(teamId, reward, userId, userName);
               setAvailablePoints(prev => prev - reward.pointCost);
-              Alert.alert('Requested!', 'Your coach will review your redemption.');
+              showAlert('Requested!', 'Your coach will review your redemption.');
             } catch (e) {
-              Alert.alert('Error', 'Could not submit redemption.');
+              showAlert('Error', 'Could not submit redemption.');
             }
           },
         },
@@ -184,7 +184,7 @@ export default function RewardsScreen() {
   // ─── Coach: Approve/Deny ───
   const handleResolve = (redemption: Redemption, status: 'approved' | 'denied') => {
     const action = status === 'approved' ? 'Approve' : 'Deny';
-    Alert.alert(
+    showAlert(
       `${action} Redemption`,
       `${action} "${redemption.rewardTitle}" for ${redemption.memberName}?`,
       [
@@ -196,7 +196,7 @@ export default function RewardsScreen() {
             try {
               await resolveRedemption(teamId, redemption.id, status);
             } catch (e) {
-              Alert.alert('Error', 'Could not update redemption.');
+              showAlert('Error', 'Could not update redemption.');
             }
           },
         },

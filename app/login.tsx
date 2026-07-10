@@ -2,8 +2,9 @@ import { router } from 'expo-router';
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { db } from '../firebaseConfig';
+import { showAlert } from '../services/alert';
 
 const ORANGE = '#FF6B35';
 const auth = getAuth();
@@ -18,11 +19,11 @@ export default function LoginScreen() {
 
   const handleAuth = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing info', 'Please enter your email and password.');
+      showAlert('Missing info', 'Please enter your email and password.');
       return;
     }
     if (isSignUp && !name.trim()) {
-      Alert.alert('Missing info', 'Please enter your name.');
+      showAlert('Missing info', 'Please enter your name.');
       return;
     }
 
@@ -52,7 +53,7 @@ export default function LoginScreen() {
       if (e.code === 'auth/wrong-password') message = 'Incorrect password. Please try again.';
       if (e.code === 'auth/user-not-found') message = 'No account found with that email.';
       if (e.code === 'auth/weak-password') message = 'Password must be at least 6 characters.';
-      Alert.alert('Error', message);
+      showAlert('Error', message);
     }
     setLoading(false);
   };

@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { showAlert } from '../services/alert';
 
 const ORANGE = '#FF6B35';
 const FUNCTIONS_ORIGIN = 'https://mark-it-done-600.netlify.app';
@@ -17,7 +18,7 @@ export default function ChoosePlanScreen() {
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user || !user.email) {
-      Alert.alert('Not signed in', 'Please sign in again to continue.');
+      showAlert('Not signed in', 'Please sign in again to continue.');
       router.replace('/login');
       return;
     }
@@ -35,7 +36,7 @@ export default function ChoosePlanScreen() {
       }
       await Linking.openURL(data.checkout_url);
     } catch (e) {
-      Alert.alert('Error', 'Could not start checkout. Please try again.');
+      showAlert('Error', 'Could not start checkout. Please try again.');
     }
     setLoading(false);
   };

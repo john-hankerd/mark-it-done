@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { showAlert } from '../../services/alert';
 import {
   getNotifSettings,
   scheduleDailyReminder,
@@ -184,7 +184,7 @@ export default function HomeScreen() {
   };
 
   const handleClearGoal = async () => {
-    Alert.alert('Remove Goal', 'Remove your weekly goal?', [
+    showAlert('Remove Goal', 'Remove your weekly goal?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove', style: 'destructive',
@@ -229,7 +229,7 @@ export default function HomeScreen() {
             } else if (newStreak % 7 === 0) {
               msg = `🔥 7-day streak on "${task.title}"! +${bonus} bonus pts!`;
             }
-            if (msg) setTimeout(() => Alert.alert('Streak Bonus!', msg), 300);
+            if (msg) setTimeout(() => showAlert('Streak Bonus!', msg), 300);
           }
           return { ...prev, [task.id]: newStreak };
         }
@@ -243,7 +243,7 @@ export default function HomeScreen() {
     if (task.type !== 'deadline') {
       setStreaks(prev => ({ ...prev, [task.id]: 0 }));
     }
-    Alert.alert('Caught up!', `"${task.title}" marked done for yesterday (0 pts, streak reset).`);
+    showAlert('Caught up!', `"${task.title}" marked done for yesterday (0 pts, streak reset).`);
   };
 
   const todayTasks = tasks.filter(t => {
@@ -278,11 +278,11 @@ export default function HomeScreen() {
   const addTask = () => {
     if (!newTitle.trim()) return;
     if (newType === 'deadline' && !newDueDate) {
-      Alert.alert('Missing due date', 'Please pick a due date for deadline tasks.');
+      showAlert('Missing due date', 'Please pick a due date for deadline tasks.');
       return;
     }
     if (newType === 'scheduled' && newScheduledDays.length === 0) {
-      Alert.alert('No days selected', 'Please pick at least one day for scheduled tasks.');
+      showAlert('No days selected', 'Please pick at least one day for scheduled tasks.');
       return;
     }
 
@@ -316,7 +316,7 @@ export default function HomeScreen() {
   };
 
   const deleteTask = (task: Task) => {
-    Alert.alert('Remove Task', `Remove "${task.title}" from your list?`, [
+    showAlert('Remove Task', `Remove "${task.title}" from your list?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove', style: 'destructive',
@@ -347,7 +347,7 @@ export default function HomeScreen() {
     const month = datePickerMonth.getMonth();
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     if (dateStr < today) {
-      Alert.alert('Invalid date', 'Due date must be today or later.');
+      showAlert('Invalid date', 'Due date must be today or later.');
       return;
     }
     setNewDueDate(dateStr);
