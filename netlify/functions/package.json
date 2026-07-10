@@ -1,0 +1,8 @@
+{
+  "name": "markitdone-functions",
+  "version": "1.0.0",
+  "description": "Netlify serverless functions for Mark It Done (Stripe billing)",
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

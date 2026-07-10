@@ -4,6 +4,7 @@ import { signOut } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import {
     Alert,
+    Linking,
     ScrollView,
     StyleSheet,
     Switch,
@@ -23,8 +24,17 @@ import {
     scheduleDailyReminder,
     setupNotifications,
 } from '../../services/notificationService';
+import { getUserProfile } from '../../services/teamService';
 
 const ORANGE = '#FF6B35';
+
+const STATUS_LABELS: Record<string, string> = {
+  trialing: 'Free trial',
+  active: 'Active',
+  past_due: 'Payment failed',
+  canceled: 'Canceled',
+  unpaid: 'Payment failed',
+};
 
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<NotifSettings>({
@@ -38,9 +48,51 @@ export default function SettingsScreen() {
   const [scheduledCount, setScheduledCount] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
+  const [isCoach, setIsCoach] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [plan, setPlan] = useState<string | null>(null);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
+
   useEffect(() => {
     loadSettings();
+    loadBillingProfile();
   }, []);
+
+  const loadBillingProfile = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      const profile = await getUserProfile(uid);
+      if (profile) {
+        setIsCoach(profile.isCoach || false);
+        setSubscriptionStatus(profile.subscriptionStatus || null);
+        setPlan(profile.plan || null);
+        setTrialEndsAt(profile.trialEndsAt || null);
+        setStripeCustomerId(profile.stripeCustomerId || null);
+      }
+    } catch (e) {
+      console.log('Billing profile load error:', e);
+    }
+  };
+
+  const manageBilling = async () => {
+    if (stripeCustomerId) {
+      try {
+        const res = await fetch('https://mark-it-done-600.netlify.app/.netlify/functions/create-portal-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stripeCustomerId }),
+        });
+        const data = await res.json();
+        if (res.ok && data.portal_url) {
+          await Linking.openURL(data.portal_url);
+          return;
+        }
+      } catch (e) {}
+    }
+    router.push('/choose-plan');
+  };
 
   const loadSettings = async () => {
     try {
@@ -279,6 +331,44 @@ export default function SettingsScreen() {
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Billing Section (Coaches only) */}
+        {isCoach && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Team Plan</Text>
+
+            <View style={styles.accountRow}>
+              <Text style={styles.accountLabel}>Status</Text>
+              <Text style={styles.accountValue}>
+                {subscriptionStatus ? (STATUS_LABELS[subscriptionStatus] || subscriptionStatus) : 'Not subscribed'}
+              </Text>
+            </View>
+
+            {plan && (
+              <View style={styles.accountRow}>
+                <Text style={styles.accountLabel}>Plan</Text>
+                <Text style={styles.accountValue}>
+                  {plan === 'annual' ? '$390/yr' : '$39/mo'}
+                </Text>
+              </View>
+            )}
+
+            {subscriptionStatus === 'trialing' && trialEndsAt && (
+              <View style={styles.accountRow}>
+                <Text style={styles.accountLabel}>Trial ends</Text>
+                <Text style={styles.accountValue}>
+                  {new Date(trialEndsAt).toLocaleDateString()}
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.testBtn} onPress={manageBilling}>
+              <Text style={styles.testBtnText}>
+                {stripeCustomerId ? 'Manage Billing' : 'Start Free Trial'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* App Info */}
         <View style={styles.section}>

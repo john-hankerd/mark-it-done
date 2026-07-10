@@ -34,9 +34,13 @@ export default function LoginScreen() {
           name: name.trim(),
           email: email.trim(),
           isCoach: isCoach,
-          isPro: false,
           createdAt: new Date().toISOString(),
         });
+        if (isCoach) {
+          router.replace('/choose-plan');
+          setLoading(false);
+          return;
+        }
       } else {
         await signInWithEmailAndPassword(auth, email.trim(), password);
       }

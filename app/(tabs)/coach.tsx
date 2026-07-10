@@ -1,9 +1,11 @@
 // MarkItDone v2.0 — Phase 2: Coach Screen with Teams
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Linking,
   Modal,
   ScrollView,
   Share,
@@ -47,6 +49,28 @@ export default function CoachScreen() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [teamTasks, setTeamTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
+
+  const hasActiveAccess = subscriptionStatus === 'trialing' || subscriptionStatus === 'active';
+
+  const goToBilling = async () => {
+    if (stripeCustomerId) {
+      try {
+        const res = await fetch('https://mark-it-done-600.netlify.app/.netlify/functions/create-portal-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stripeCustomerId }),
+        });
+        const data = await res.json();
+        if (res.ok && data.portal_url) {
+          await Linking.openURL(data.portal_url);
+          return;
+        }
+      } catch (e) {}
+    }
+    router.push('/choose-plan');
+  };
 
   // Create team modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -90,6 +114,8 @@ export default function CoachScreen() {
       if (profile) {
         setUserName(profile.name || '');
         setIsCoach(profile.isCoach || false);
+        setSubscriptionStatus(profile.subscriptionStatus || null);
+        setStripeCustomerId(profile.stripeCustomerId || null);
       }
 
       const teamId = await getUserTeamId(userId);
@@ -322,7 +348,7 @@ export default function CoachScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>
-          {isCoach && (
+          {isCoach && hasActiveAccess && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>🏆 Create Your Team</Text>
               <Text style={styles.sectionDesc}>
@@ -333,6 +359,19 @@ export default function CoachScreen() {
                 onPress={() => setShowCreateModal(true)}
               >
                 <Text style={styles.actionBtnText}>Create Team</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {isCoach && !hasActiveAccess && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🏆 Create Your Team</Text>
+              <Text style={styles.sectionDesc}>
+                Creating and managing a team is part of the Team plan — $39/mo or $390/yr, with a
+                30-day free trial.
+              </Text>
+              <TouchableOpacity style={styles.actionBtn} onPress={goToBilling}>
+                <Text style={styles.actionBtnText}>Start free trial</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -431,7 +470,7 @@ export default function CoachScreen() {
               {isCoach ? 'You\'re the coach' : `Coach: ${team.coachName}`}
             </Text>
           </View>
-          {isCoach && (
+          {isCoach && hasActiveAccess && (
             <TouchableOpacity style={styles.addButton} onPress={() => setShowAddTaskModal(true)}>
               <Text style={styles.addButtonText}>+ Task</Text>
             </TouchableOpacity>
@@ -445,6 +484,18 @@ export default function CoachScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
+
+        {isCoach && !hasActiveAccess && (
+          <View style={styles.frozenBanner}>
+            <Text style={styles.frozenBannerText}>
+              Your Team plan isn't active. Your team stays visible, but you'll need to subscribe
+              to add or change tasks.
+            </Text>
+            <TouchableOpacity style={styles.frozenBannerBtn} onPress={goToBilling}>
+              <Text style={styles.frozenBannerBtnText}>Subscribe</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Members */}
         <View style={styles.section}>
@@ -493,8 +544,8 @@ export default function CoachScreen() {
               <TouchableOpacity
                 key={task.id}
                 style={styles.taskRow}
-                onLongPress={() => isCoach && handleRemoveTeamTask(task)}
-                activeOpacity={isCoach ? 0.7 : 1}
+                onLongPress={() => isCoach && hasActiveAccess && handleRemoveTeamTask(task)}
+                activeOpacity={isCoach && hasActiveAccess ? 0.7 : 1}
               >
                 <View style={styles.taskIcon}>
                   <Text style={{ fontSize: 18 }}>{task.icon}</Text>
@@ -506,7 +557,7 @@ export default function CoachScreen() {
               </TouchableOpacity>
             ))
           )}
-          {isCoach && teamTasks.length > 0 && (
+          {isCoach && hasActiveAccess && teamTasks.length > 0 && (
             <Text style={styles.hintText}>Hold a task to remove it</Text>
           )}
         </View>
@@ -725,6 +776,23 @@ const styles = StyleSheet.create({
   sectionDesc: { color: '#aaa', fontSize: 13, lineHeight: 20 },
   emptyText: { color: '#aaa', fontSize: 13 },
   hintText: { color: '#ccc', fontSize: 11, textAlign: 'center', marginTop: 4 },
+
+  frozenBanner: {
+    backgroundColor: '#fff0ea',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: ORANGE,
+    marginBottom: 16,
+  },
+  frozenBannerText: { color: '#8a4a2e', fontSize: 13, lineHeight: 19, marginBottom: 12 },
+  frozenBannerBtn: {
+    backgroundColor: ORANGE,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  frozenBannerBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   // Members
   memberRow: {
