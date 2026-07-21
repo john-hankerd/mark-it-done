@@ -32,6 +32,14 @@ export function isTaskActiveToday(task: Task): boolean {
 }
 
 export function wasTaskActiveOn(task: Task, dateStr: string): boolean {
+  // A task can't have been "active" — let alone missed — on a day before
+  // it existed. Without this, a brand-new daily/scheduled task looks
+  // active for every date in the past (its pattern matches regardless of
+  // when it was created), so it shows up as "missed yesterday" the
+  // instant someone creates it today.
+  const createdDate = task.createdAt.split('T')[0];
+  if (createdDate > dateStr) return false;
+
   const dow = dayOfWeek(dateStr);
 
   switch (task.type) {
