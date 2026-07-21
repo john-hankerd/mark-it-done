@@ -6,8 +6,15 @@
 // toolbar is showing. Combined with overflow:hidden, whatever falls in that
 // gap — here, the bottom tab bar — is clipped and inaccessible, not just
 // scrolled off. `100dvh` (dynamic viewport height) tracks the real visible
-// area instead, and `viewport-fit=cover` is what lets that value (and
-// `env(safe-area-inset-*)`, used by SafeAreaView) resolve correctly at all.
+// area instead.
+//
+// Deliberately NOT setting `viewport-fit=cover` here: on Android's classic
+// 3-button nav bar, that flag tells the browser to draw content edge-to-edge
+// behind system UI, but Android (unlike iOS) often doesn't report that space
+// back via `env(safe-area-inset-bottom)` — so nothing compensates, and the
+// tab bar renders right underneath the opaque nav bar, fully hidden. Without
+// `viewport-fit=cover`, the browser keeps content clear of system UI on its
+// own, which is what we want.
 import { ScrollViewStyleReset } from 'expo-router/html';
 import { type PropsWithChildren } from 'react';
 
@@ -19,7 +26,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
+          content="width=device-width, initial-scale=1, shrink-to-fit=no"
         />
         <ScrollViewStyleReset />
         <style
