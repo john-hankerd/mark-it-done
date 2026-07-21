@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { showAlert } from '../../services/alert';
+import { getChecklists, saveChecklists } from '../../services/checklistService';
 import {
   getNotifSettings,
   scheduleDailyReminder,
@@ -44,6 +45,7 @@ import {
   wasTaskActiveOn,
   yesterdayString,
 } from '../../types/helpers';
+import { ChecklistTemplate } from '../../types/checklist';
 import { DAY_LABELS, Task, TaskType } from '../../types/task';
 
 const STORAGE_KEY = '@markitdone_tasks';
@@ -55,6 +57,11 @@ const ORANGE = '#FF6B35';
 const ICONS = [
   '💪','📞','🏃','📚','💧','✍️','🥗','🧘','😴','🎯',
   '🚫','⭐','🔥','💡','🏆','✅','🎵','🧠','❤️','🙏',
+];
+
+const CHECKLIST_ICONS = [
+  '📋','🧹','🧯','📦','🛒','🔧','🧰','🚽','🧼','🗑️',
+  '🔑','🚗','🏢','📝','✅','⚠️','🔥','💧','🌡️','🧾',
 ];
 
 export default function HomeScreen() {
@@ -84,6 +91,14 @@ export default function HomeScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerMonth, setDatePickerMonth] = useState(new Date());
 
+  const [checklists, setChecklists] = useState<ChecklistTemplate[]>([]);
+  const [showChecklistsModal, setShowChecklistsModal] = useState(false);
+  const [showEditChecklistModal, setShowEditChecklistModal] = useState(false);
+  const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
+  const [checklistTitle, setChecklistTitle] = useState('');
+  const [checklistIcon, setChecklistIcon] = useState('📋');
+  const [checklistItems, setChecklistItems] = useState<string[]>(['', '']);
+
   useEffect(() => { loadData(); }, []);
   useEffect(() => {
     if (loaded) {
@@ -91,6 +106,10 @@ export default function HomeScreen() {
       updatePointsLog();
     }
   }, [tasks, completions, streaks, loaded]);
+
+  useEffect(() => {
+    if (loaded) saveChecklists(checklists);
+  }, [checklists, loaded]);
 
   // Notifications: schedule reminders when tasks/completions change
   useEffect(() => {
@@ -146,6 +165,9 @@ export default function HomeScreen() {
 
       const goal = await getPersonalGoal();
       setWeeklyGoal(goal);
+
+      const savedChecklists = await getChecklists();
+      setChecklists(savedChecklists);
     } catch (e) {
       console.log('Load error:', e);
     }
@@ -325,6 +347,138 @@ export default function HomeScreen() {
     ]);
   };
 
+  // ─── Checklists ───────────────────────────────────────────────────────
+
+  const activateChecklist = (id: string) => {
+    setChecklists(prev => prev.map(c =>
+      c.id === id
+        ? { ...c, isActive: true, completedItemIds: [], activatedAt: new Date().toISOString() }
+        : c
+    ));
+  };
+
+  const resetChecklist = (checklist: ChecklistTemplate) => {
+    showAlert('Reset Checklist', `Stop "${checklist.title}" and clear its progress?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset', style: 'destructive',
+        onPress: () => setChecklists(prev => prev.map(c =>
+          c.id === checklist.id ? { ...c, isActive: false, completedItemIds: [] } : c
+        )),
+      },
+    ]);
+  };
+
+  const toggleChecklistItem = (checklist: ChecklistTemplate, itemId: string) => {
+    const wasDone = checklist.completedItemIds.includes(itemId);
+    const nextCompleted = wasDone
+      ? checklist.completedItemIds.filter(id => id !== itemId)
+      : [...checklist.completedItemIds, itemId];
+
+    const justFinished = !wasDone && nextCompleted.length === checklist.items.length;
+
+    setChecklists(prev => prev.map(c => {
+      if (c.id !== checklist.id) return c;
+      if (justFinished) return { ...c, isActive: false, completedItemIds: [] };
+      return { ...c, completedItemIds: nextCompleted };
+    }));
+
+    if (justFinished) {
+      setTimeout(() => showAlert(
+        'Nice work! ✅',
+        `"${checklist.title}" is all done. It's reset and ready for next time.`
+      ), 200);
+    }
+  };
+
+  const openNewChecklistModal = () => {
+    setEditingChecklistId(null);
+    setChecklistTitle('');
+    setChecklistIcon('📋');
+    setChecklistItems(['', '']);
+    setShowChecklistsModal(false);
+    setShowEditChecklistModal(true);
+  };
+
+  const openEditChecklistModal = (checklist: ChecklistTemplate) => {
+    setEditingChecklistId(checklist.id);
+    setChecklistTitle(checklist.title);
+    setChecklistIcon(checklist.icon);
+    setChecklistItems(checklist.items.length > 0 ? checklist.items.map(i => i.label) : ['', '']);
+    setShowChecklistsModal(false);
+    setShowEditChecklistModal(true);
+  };
+
+  const closeEditChecklistModal = () => {
+    setShowEditChecklistModal(false);
+    setShowChecklistsModal(true);
+  };
+
+  const updateChecklistItemText = (index: number, text: string) => {
+    setChecklistItems(prev => prev.map((v, i) => (i === index ? text : v)));
+  };
+
+  const addChecklistItemField = () => {
+    setChecklistItems(prev => [...prev, '']);
+  };
+
+  const removeChecklistItemField = (index: number) => {
+    setChecklistItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveChecklistTemplate = () => {
+    const title = checklistTitle.trim();
+    const items = checklistItems.map(i => i.trim()).filter(Boolean);
+
+    if (!title) {
+      showAlert('Missing name', 'Give your checklist a name.');
+      return;
+    }
+    if (items.length === 0) {
+      showAlert('No items', 'Add at least one item to the checklist.');
+      return;
+    }
+
+    const itemDefs = items.map((label, i) => {
+      const existing = editingChecklistId
+        ? checklists.find(c => c.id === editingChecklistId)?.items[i]
+        : undefined;
+      return { id: existing?.label === label ? existing.id : `item-${Date.now()}-${i}`, label };
+    });
+
+    if (editingChecklistId) {
+      setChecklists(prev => prev.map(c =>
+        c.id === editingChecklistId
+          ? { ...c, title, icon: checklistIcon, items: itemDefs }
+          : c
+      ));
+    } else {
+      const newChecklist: ChecklistTemplate = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+        title,
+        icon: checklistIcon,
+        items: itemDefs,
+        isActive: false,
+        completedItemIds: [],
+        createdAt: new Date().toISOString(),
+      };
+      setChecklists(prev => [...prev, newChecklist]);
+    }
+
+    setShowEditChecklistModal(false);
+    setShowChecklistsModal(true);
+  };
+
+  const deleteChecklistTemplate = (checklist: ChecklistTemplate) => {
+    showAlert('Delete Checklist', `Delete "${checklist.title}"? This can't be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: () => setChecklists(prev => prev.filter(c => c.id !== checklist.id)),
+      },
+    ]);
+  };
+
   const toggleScheduledDay = (day: number) => {
     setNewScheduledDays(prev =>
       prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
@@ -437,6 +591,9 @@ export default function HomeScreen() {
   const coachTasks = todayTasks.filter(t => t.assignedBy === 'coach');
   const selfTasks = todayTasks.filter(t => t.assignedBy === 'self');
 
+  const activeChecklists = checklists.filter(c => c.isActive);
+  const readyChecklistCount = checklists.length - activeChecklists.length;
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -528,6 +685,58 @@ export default function HomeScreen() {
             </View>
           </TouchableOpacity>
         )}
+
+        {activeChecklists.map(checklist => (
+          <View key={checklist.id} style={styles.activeChecklistCard}>
+            <View style={styles.activeChecklistHeader}>
+              <Text style={styles.activeChecklistTitle}>
+                {checklist.icon} {checklist.title}
+              </Text>
+              <TouchableOpacity onPress={() => resetChecklist(checklist)}>
+                <Text style={styles.activeChecklistReset}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.goalProgressTrack}>
+              <View style={[
+                styles.goalProgressFill,
+                { width: `${Math.round((checklist.completedItemIds.length / checklist.items.length) * 100)}%` },
+              ]} />
+            </View>
+            <Text style={styles.activeChecklistProgress}>
+              {checklist.completedItemIds.length}/{checklist.items.length} done
+            </Text>
+            {checklist.items.map(item => {
+              const done = checklist.completedItemIds.includes(item.id);
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.checklistItemRow}
+                  onPress={() => toggleChecklistItem(checklist, item.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.checklistItemBox, done && styles.checklistItemBoxDone]}>
+                    {done && <Text style={styles.checklistItemCheck}>✓</Text>}
+                  </View>
+                  <Text style={[styles.checklistItemLabel, done && styles.checklistItemLabelDone]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ))}
+
+        <TouchableOpacity style={styles.checklistsEntryBtn} onPress={() => setShowChecklistsModal(true)}>
+          <Text style={styles.setGoalIcon}>📋</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.setGoalTitle}>Checklists</Text>
+            <Text style={styles.setGoalDesc}>
+              {checklists.length === 0
+                ? 'Set up a reusable checklist, like weekly cleaning or a supply order'
+                : `${readyChecklistCount} ready to activate${activeChecklists.length > 0 ? ` · ${activeChecklists.length} in progress` : ''}`}
+            </Text>
+          </View>
+        </TouchableOpacity>
 
         <Text style={styles.hint}>Tap to complete · Hold to remove</Text>
 
@@ -852,6 +1061,130 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={showChecklistsModal} animationType="slide" transparent onRequestClose={() => setShowChecklistsModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
+              <Text style={styles.modalTitle}>Checklists</Text>
+              <Text style={styles.modalSub}>
+                Reusable lists for stuff you do again and again — weekly cleaning, a monthly safety check, a supply order. Activate one when you start it; it resets when you finish.
+              </Text>
+
+              {checklists.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>📋</Text>
+                  <Text style={styles.emptyTitle}>No checklists yet</Text>
+                  <Text style={styles.emptyDesc}>Create one below to get started</Text>
+                </View>
+              )}
+
+              {checklists.map(checklist => (
+                <View key={checklist.id} style={styles.checklistRow}>
+                  <View style={styles.checklistRowInfo}>
+                    <Text style={styles.checklistRowTitle}>{checklist.icon} {checklist.title}</Text>
+                    <Text style={styles.checklistRowMeta}>
+                      {checklist.items.length} item{checklist.items.length === 1 ? '' : 's'}
+                      {checklist.isActive ? `  ·  ${checklist.completedItemIds.length}/${checklist.items.length} in progress` : '  ·  Ready'}
+                    </Text>
+                  </View>
+                  <View style={styles.checklistRowActions}>
+                    {!checklist.isActive && (
+                      <TouchableOpacity
+                        style={styles.checklistActivateBtn}
+                        onPress={() => { activateChecklist(checklist.id); setShowChecklistsModal(false); }}
+                      >
+                        <Text style={styles.checklistActivateBtnText}>Activate</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={styles.checklistIconBtn} onPress={() => openEditChecklistModal(checklist)}>
+                      <Text style={styles.checklistIconBtnText}>✏️</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.checklistIconBtn} onPress={() => deleteChecklistTemplate(checklist)}>
+                      <Text style={styles.checklistIconBtnText}>🗑</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              <View style={styles.modalBtns}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowChecklistsModal(false)}>
+                  <Text style={styles.cancelBtnText}>Close</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveBtn} onPress={openNewChecklistModal}>
+                  <Text style={styles.saveBtnText}>+ New Checklist</Text>
+                </TouchableOpacity>
+              </View>
+
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEditChecklistModal} animationType="slide" transparent onRequestClose={closeEditChecklistModal}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
+              <Text style={styles.modalTitle}>{editingChecklistId ? 'Edit Checklist' : 'New Checklist'}</Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Checklist name, e.g. Weekly Office Cleaning"
+                placeholderTextColor="#aaa"
+                value={checklistTitle}
+                onChangeText={setChecklistTitle}
+                autoFocus
+              />
+
+              <Text style={styles.fieldLabel}>Icon</Text>
+              <View style={styles.iconGrid}>
+                {CHECKLIST_ICONS.map(icon => (
+                  <TouchableOpacity
+                    key={icon}
+                    style={[styles.iconBtn, checklistIcon === icon && styles.iconBtnSelected]}
+                    onPress={() => setChecklistIcon(icon)}
+                  >
+                    <Text style={styles.iconText}>{icon}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Items</Text>
+              {checklistItems.map((item, i) => (
+                <View key={i} style={styles.checklistItemInputRow}>
+                  <TextInput
+                    style={[styles.input, styles.checklistItemInput]}
+                    placeholder={`Step ${i + 1}`}
+                    placeholderTextColor="#aaa"
+                    value={item}
+                    onChangeText={(text) => updateChecklistItemText(i, text)}
+                  />
+                  {checklistItems.length > 1 && (
+                    <TouchableOpacity style={styles.checklistItemRemoveBtn} onPress={() => removeChecklistItemField(i)}>
+                      <Text style={styles.checklistItemRemoveBtnText}>✕</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+              <TouchableOpacity style={styles.addItemBtn} onPress={addChecklistItemField}>
+                <Text style={styles.addItemBtnText}>+ Add Item</Text>
+              </TouchableOpacity>
+
+              <View style={styles.modalBtns}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={closeEditChecklistModal}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveBtn} onPress={saveChecklistTemplate}>
+                  <Text style={styles.saveBtnText}>Save Checklist</Text>
+                </TouchableOpacity>
+              </View>
+
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1164,4 +1497,87 @@ const styles = StyleSheet.create({
   saveBtn: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center' },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  // ─── Checklists ─────────────────────────────────────────────────────
+  checklistsEntryBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#e8e4df',
+    borderStyle: 'dashed',
+  },
+
+  activeChecklistCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: ORANGE,
+    gap: 8,
+  },
+  activeChecklistHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  activeChecklistTitle: { fontSize: 15, fontWeight: '700', color: '#1a1a2e' },
+  activeChecklistReset: { fontSize: 12, fontWeight: '600', color: '#ff4444' },
+  activeChecklistProgress: { fontSize: 12, color: '#999' },
+
+  checklistItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+  },
+  checklistItemBox: {
+    width: 24, height: 24, borderRadius: 7,
+    borderWidth: 1.5, borderColor: '#e0dcd4',
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  checklistItemBoxDone: { backgroundColor: ORANGE, borderColor: ORANGE },
+  checklistItemCheck: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  checklistItemLabel: { fontSize: 14, color: '#2d2d2d', flex: 1 },
+  checklistItemLabelDone: { color: '#aaa', textDecorationLine: 'line-through' },
+
+  checklistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f7f5f2',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    gap: 10,
+  },
+  checklistRowInfo: { flex: 1 },
+  checklistRowTitle: { fontSize: 14, fontWeight: '700', color: '#1a1a2e' },
+  checklistRowMeta: { fontSize: 11, color: '#999', marginTop: 2 },
+  checklistRowActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  checklistActivateBtn: {
+    backgroundColor: ORANGE, borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 7,
+  },
+  checklistActivateBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  checklistIconBtn: { padding: 6 },
+  checklistIconBtnText: { fontSize: 16 },
+
+  checklistItemInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  checklistItemInput: { flex: 1 },
+  checklistItemRemoveBtn: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: '#fff0f0', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12,
+  },
+  checklistItemRemoveBtnText: { color: '#ff4444', fontSize: 14, fontWeight: '700' },
+  addItemBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8, paddingHorizontal: 4,
+    marginBottom: 16, marginTop: -4,
+  },
+  addItemBtnText: { color: ORANGE, fontSize: 13, fontWeight: '700' },
 });
