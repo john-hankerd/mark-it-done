@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can only read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Teams: only the coach who created it can update/delete the team
+    // document itself; any signed-in user can read it (needed to preview a
+    // team before joining) and create one (becoming a coach).
+    match /teams/{teamId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null &&
+        resource.data.coachId == request.auth.uid;
+
+      // Members: a user can only ever write their OWN membership entry
+      // (the coach adds themselves on team creation; a joining member adds
+      // themselves via joinTeam) — never someone else's. Any signed-in user
+      // can read the roster (needed to display the member list).
+      match /members/{memberId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == memberId;
+      }
+
+      // Tasks: any signed-in user can read (members need to see what's
+      // assigned); only the team's coach can create/update/delete them.
+      match /tasks/{taskId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null &&
+          get(/databases/$(database)/documents/teams/$(teamId)).data.coachId == request.auth.uid;
+      }
+
+      // Completions: any signed-in team member can read (leaderboard); a
+      // user can only write their own completion record.
+      match /completions/{completionId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null &&
+          request.resource.data.memberId == request.auth.uid;
+      }
+    }
+
+  }
+}
