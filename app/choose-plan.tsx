@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { showAlert } from '../services/alert';
+import { getUserProfile } from '../services/teamService';
 
 const ORANGE = '#FF6B35';
 const FUNCTIONS_ORIGIN = 'https://mark-it-done-600.netlify.app';
@@ -13,6 +14,19 @@ export default function ChoosePlanScreen() {
   const { canceled } = useLocalSearchParams<{ canceled?: string }>();
   const [selected, setSelected] = useState<Plan>('annual');
   const [loading, setLoading] = useState(false);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    const uid = getAuth().currentUser?.uid;
+    if (!uid) return;
+    getUserProfile(uid).then((profile) => {
+      if (profile?.trialEndsAt) setTrialEndsAt(profile.trialEndsAt);
+    });
+  }, []);
+
+  const trialDaysLeft = trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   const startTrial = async () => {
     const auth = getAuth();
@@ -28,7 +42,7 @@ export default function ChoosePlanScreen() {
       const res = await fetch(`${FUNCTIONS_ORIGIN}/.netlify/functions/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: user.uid, email: user.email, plan: selected }),
+        body: JSON.stringify({ uid: user.uid, email: user.email, plan: selected, trialEndsAt }),
       });
       const data = await res.json();
       if (!res.ok || !data.checkout_url) {
@@ -88,13 +102,14 @@ export default function ChoosePlanScreen() {
         disabled={loading}
       >
         <Text style={styles.startBtnText}>
-          {loading ? 'Please wait...' : 'Start 30-day free trial'}
+          {loading ? 'Please wait...' : 'Add Card'}
         </Text>
       </TouchableOpacity>
 
       <Text style={styles.fineprint}>
-        A card is required to start your trial. You won't be charged for 30 days, and you can
-        cancel anytime before then.
+        {trialDaysLeft > 0
+          ? `You won't be charged until your free trial ends in ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'}. Cancel anytime before then.`
+          : "Your free trial has ended, so you'll be charged as soon as you add a card."}
       </Text>
     </ScrollView>
   );

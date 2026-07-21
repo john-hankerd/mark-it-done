@@ -9,8 +9,8 @@ export default function BillingSuccessScreen() {
       <Text style={styles.icon}>🎉</Text>
       <Text style={styles.title}>You're all set!</Text>
       <Text style={styles.subtitle}>
-        Your 30-day free trial has started. Head to the Team tab to create your team and start
-        assigning disciplines.
+        Your card is on file. Head to the Team tab to create your team and start assigning
+        disciplines.
       </Text>
       <TouchableOpacity style={styles.btn} onPress={() => router.replace('/(tabs)')}>
         <Text style={styles.btnText}>Continue to Mark It Done</Text>

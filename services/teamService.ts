@@ -178,3 +178,17 @@ export async function setUserIsCoach(userId: string, isCoach: boolean): Promise<
     isCoach,
   });
 }
+
+// Grants the 30-day coach trial with no card required. subscriptionStatus
+// stays 'trialing' — access is gated by trialEndsAt on the client until the
+// user adds a card (see create-checkout-session.js, which then charges
+// starting exactly at trialEndsAt rather than granting a second trial).
+export async function startCoachTrial(userId: string): Promise<string> {
+  const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  await updateDoc(doc(db, 'users', userId), {
+    isCoach: true,
+    subscriptionStatus: 'trialing',
+    trialEndsAt,
+  });
+  return trialEndsAt;
+}

@@ -1,7 +1,10 @@
 // netlify/functions/create-checkout-session.js
-// Called from the app when a Coach picks a plan. Creates a Stripe Checkout
-// Session (subscription mode, 30-day trial, card required) and returns the
-// URL to redirect to.
+// Called from the app when a Coach adds a card. The 30-day free trial itself
+// is granted app-side with no card (see teamService.startCoachTrial) — this
+// only runs once someone actually adds a card, either to keep access after
+// their trial ends or to add one early. If `trialEndsAt` is still in the
+// future, the Stripe subscription's first charge is deferred to that exact
+// date so they don't get billed early; otherwise it charges immediately.
 
 const https = require("https");
 const querystring = require("querystring");
@@ -66,7 +69,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: corsHeaders, body: "Invalid JSON" };
   }
 
-  const { uid, email, plan } = payload;
+  const { uid, email, plan, trialEndsAt } = payload;
 
   if (!uid || !email) {
     return {
@@ -87,11 +90,17 @@ exports.handler = async (event) => {
     client_reference_id: uid,
     success_url: `${APP_URL}/billing-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${APP_URL}/choose-plan?canceled=1`,
-    "subscription_data[trial_period_days]": "30",
     "subscription_data[metadata][uid]": uid,
     "subscription_data[metadata][plan]": plan || "monthly",
     "metadata[uid]": uid,
   };
+
+  // Only defer the first charge if the app-granted free trial hasn't ended
+  // yet. Stripe requires trial_end to be at least 48 hours out.
+  const trialEndMs = trialEndsAt ? new Date(trialEndsAt).getTime() : 0;
+  if (trialEndMs > Date.now() + 48 * 60 * 60 * 1000) {
+    sessionParams["subscription_data[trial_end]"] = String(Math.floor(trialEndMs / 1000));
+  }
 
   try {
     const result = await stripePost("/v1/checkout/sessions", sessionParams);

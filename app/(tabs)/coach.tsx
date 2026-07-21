@@ -51,8 +51,10 @@ export default function CoachScreen() {
   const [loading, setLoading] = useState(true);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
 
-  const hasActiveAccess = subscriptionStatus === 'trialing' || subscriptionStatus === 'active';
+  const trialActive = subscriptionStatus === 'trialing' && !!trialEndsAt && new Date(trialEndsAt) > new Date();
+  const hasActiveAccess = subscriptionStatus === 'active' || trialActive;
 
   const goToBilling = async () => {
     if (stripeCustomerId) {
@@ -116,6 +118,7 @@ export default function CoachScreen() {
         setIsCoach(profile.isCoach || false);
         setSubscriptionStatus(profile.subscriptionStatus || null);
         setStripeCustomerId(profile.stripeCustomerId || null);
+        setTrialEndsAt(profile.trialEndsAt || null);
       }
 
       const teamId = await getUserTeamId(userId);
@@ -367,11 +370,11 @@ export default function CoachScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>🏆 Create Your Team</Text>
               <Text style={styles.sectionDesc}>
-                Creating and managing a team is part of the Team plan — $39/mo or $390/yr, with a
-                30-day free trial.
+                Your 30-day free trial has ended. Add a card to keep creating and managing a
+                team — $39/mo or $390/yr.
               </Text>
               <TouchableOpacity style={styles.actionBtn} onPress={goToBilling}>
-                <Text style={styles.actionBtnText}>Start free trial</Text>
+                <Text style={styles.actionBtnText}>Add Card</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -488,11 +491,11 @@ export default function CoachScreen() {
         {isCoach && !hasActiveAccess && (
           <View style={styles.frozenBanner}>
             <Text style={styles.frozenBannerText}>
-              Your Team plan isn't active. Your team stays visible, but you'll need to subscribe
+              Your free trial has ended. Your team stays visible, but you'll need to add a card
               to add or change tasks.
             </Text>
             <TouchableOpacity style={styles.frozenBannerBtn} onPress={goToBilling}>
-              <Text style={styles.frozenBannerBtnText}>Subscribe</Text>
+              <Text style={styles.frozenBannerBtnText}>Add Card</Text>
             </TouchableOpacity>
           </View>
         )}

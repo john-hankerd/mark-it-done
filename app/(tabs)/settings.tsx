@@ -24,7 +24,7 @@ import {
     scheduleDailyReminder,
     setupNotifications,
 } from '../../services/notificationService';
-import { getUserProfile, setUserIsCoach } from '../../services/teamService';
+import { getUserProfile, startCoachTrial } from '../../services/teamService';
 
 const ORANGE = '#FF6B35';
 
@@ -53,6 +53,9 @@ export default function SettingsScreen() {
   const [plan, setPlan] = useState<string | null>(null);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
+
+  const trialActive = subscriptionStatus === 'trialing' && !!trialEndsAt && new Date(trialEndsAt) > new Date();
+  const hasActiveAccess = subscriptionStatus === 'active' || trialActive;
 
   useEffect(() => {
     loadSettings();
@@ -98,9 +101,14 @@ export default function SettingsScreen() {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     try {
-      await setUserIsCoach(uid, true);
+      const trialEndsAt = await startCoachTrial(uid);
       setIsCoach(true);
-      router.push('/choose-plan');
+      setSubscriptionStatus('trialing');
+      setTrialEndsAt(trialEndsAt);
+      showAlert(
+        "You're a Coach!",
+        "Your 30-day free trial has started — no card needed. Head to the Team tab to create your team."
+      );
     } catch (e) {
       showAlert('Error', 'Could not switch to a Team plan. Please try again.');
     }
@@ -352,11 +360,15 @@ export default function SettingsScreen() {
             <View style={styles.accountRow}>
               <Text style={styles.accountLabel}>Status</Text>
               <Text style={styles.accountValue}>
-                {subscriptionStatus ? (STATUS_LABELS[subscriptionStatus] || subscriptionStatus) : 'Not subscribed'}
+                {trialActive
+                  ? 'Free trial'
+                  : subscriptionStatus
+                  ? (STATUS_LABELS[subscriptionStatus] || subscriptionStatus)
+                  : 'Trial ended'}
               </Text>
             </View>
 
-            {plan && (
+            {plan && stripeCustomerId && (
               <View style={styles.accountRow}>
                 <Text style={styles.accountLabel}>Plan</Text>
                 <Text style={styles.accountValue}>
@@ -365,7 +377,7 @@ export default function SettingsScreen() {
               </View>
             )}
 
-            {subscriptionStatus === 'trialing' && trialEndsAt && (
+            {trialActive && trialEndsAt && (
               <View style={styles.accountRow}>
                 <Text style={styles.accountLabel}>Trial ends</Text>
                 <Text style={styles.accountValue}>
@@ -374,9 +386,17 @@ export default function SettingsScreen() {
               </View>
             )}
 
+            {!stripeCustomerId && (
+              <Text style={styles.settingDesc}>
+                {trialActive
+                  ? "No card needed during your trial. Add one anytime to keep access after it ends."
+                  : 'Your free trial has ended. Add a card to keep using your coach portal.'}
+              </Text>
+            )}
+
             <TouchableOpacity style={styles.testBtn} onPress={manageBilling}>
               <Text style={styles.testBtnText}>
-                {stripeCustomerId ? 'Manage Billing' : 'Start Free Trial'}
+                {stripeCustomerId ? 'Manage Billing' : 'Add Card'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -388,8 +408,8 @@ export default function SettingsScreen() {
             <Text style={styles.sectionTitle}>Coaching a Team?</Text>
             <Text style={styles.settingDesc}>
               Switch to a Team plan to create a team, assign disciplines, and track everyone's
-              progress. $39/mo or $390/yr, with a 30-day free trial. Your tasks and history stay
-              exactly as they are.
+              progress. $39/mo or $390/yr, with a 30-day free trial — no card required to start.
+              Your tasks and history stay exactly as they are.
             </Text>
             <TouchableOpacity style={styles.testBtn} onPress={becomeCoach}>
               <Text style={styles.testBtnText}>Become a Coach</Text>

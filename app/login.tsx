@@ -31,17 +31,18 @@ export default function LoginScreen() {
     try {
       if (isSignUp) {
         const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        await setDoc(doc(db, 'users', result.user.uid), {
+        const userDoc: Record<string, unknown> = {
           name: name.trim(),
           email: email.trim(),
           isCoach: isCoach,
           createdAt: new Date().toISOString(),
-        });
+        };
         if (isCoach) {
-          router.replace('/choose-plan');
-          setLoading(false);
-          return;
+          // 30-day coach trial starts immediately, no card required.
+          userDoc.subscriptionStatus = 'trialing';
+          userDoc.trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         }
+        await setDoc(doc(db, 'users', result.user.uid), userDoc);
       } else {
         await signInWithEmailAndPassword(auth, email.trim(), password);
       }
