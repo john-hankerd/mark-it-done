@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -16,6 +16,28 @@ export default function LoginScreen() {
   const [name, setName] = useState('');
   const [isCoach, setIsCoach] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      showAlert('Enter your email', 'Type your email address above, then tap "Forgot password?" again.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+    } catch (e: any) {
+      if (e.code === 'auth/invalid-email') {
+        showAlert('Error', 'Please enter a valid email address.');
+        return;
+      }
+      if (e.code === 'auth/too-many-requests') {
+        showAlert('Error', 'Too many tries. Please wait a few minutes and try again.');
+        return;
+      }
+      // For privacy, don't reveal whether the email has an account.
+      console.error('Password reset error:', e);
+    }
+    showAlert('Check your email', `If ${email.trim()} has an account, we just sent a link to reset your password. Check your spam folder too.`);
+  };
 
   const handleAuth = async () => {
     if (!email.trim() || !password.trim()) {
@@ -49,11 +71,19 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     } catch (e: any) {
       let message = 'Something went wrong. Please try again.';
-      if (e.code === 'auth/email-already-in-use') message = 'That email is already registered. Try signing in.';
+      if (e.code === 'auth/email-already-in-use') message = 'That email already has an account. Tap "Sign in" below. If you forgot your password, tap "Forgot password?" on the sign-in screen.';
       if (e.code === 'auth/invalid-email') message = 'Please enter a valid email address.';
       if (e.code === 'auth/wrong-password') message = 'Incorrect password. Please try again.';
       if (e.code === 'auth/user-not-found') message = 'No account found with that email.';
       if (e.code === 'auth/weak-password') message = 'Password must be at least 6 characters.';
+      // Newer Firebase versions send this one code for BOTH a wrong password
+      // and an email that isn't signed up yet.
+      if (e.code === 'auth/invalid-credential') message = 'That email or password is not right. Please check them and try again.';
+      if (e.code === 'auth/too-many-requests') message = 'Too many tries. Please wait a few minutes and try again.';
+      if (e.code === 'auth/network-request-failed') message = 'No internet connection. Please check your signal and try again.';
+      // Anything else: show the code so we can track it down.
+      if (message === 'Something went wrong. Please try again.' && e?.code) message += ` (${e.code})`;
+      console.error('Login error:', e);
       showAlert('Error', message);
     }
     setLoading(false);
@@ -106,6 +136,12 @@ export default function LoginScreen() {
             onChangeText={setPassword}
             secureTextEntry={true}
           />
+
+          {!isSignUp && (
+            <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotRow}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
+          )}
 
           {isSignUp && (
             <View style={styles.roleSection}>
@@ -215,6 +251,9 @@ const styles = StyleSheet.create({
   },
   authBtnDisabled: { opacity: 0.6 },
   authBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  forgotRow: { alignItems: 'flex-end', marginTop: -4, marginBottom: 16 },
+  forgotText: { fontSize: 13, color: ORANGE, fontWeight: '600' },
 
   switchRow: { alignItems: 'center' },
   switchText: { fontSize: 14, color: '#aaa' },
